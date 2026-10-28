@@ -15,7 +15,7 @@ This project consists of setting up a server by following specific rules. A mini
 # SETUP
 
 ## Preparation:
-We will need to prepare certain things beforehand:
+
 - **Hypervisor:** [VirtualBox](https://www.virtualbox.org/)
 - **Operating system:** [Debian 13 (Trixie)](https://www.debian.org/download)
 - **External storage:** Not needed if the VM is stored in the sgoinfre directory.
@@ -54,12 +54,15 @@ The remaining usable space is left unallocated within the LVM volume group, allo
 
 ## 3. Virtual Machine configuration:
 Launch the virtual machine and log in with the user created during installation.
+
 ### 3.1 Sudo:
+
 **sudo (superuser do)** allows authorized users to execute commands with root privileges without logging in as root.
 - **Root:** Has full administrative privileges. Commands can be executed without sudo.
 - **Regular user:** Has limited permissions and must use sudo for administrative tasks, provided the user has been granted permission.
 
 **Install sudo:**
+
 Switch to root user `su`, the `-` loads root's login environment:
 ```bash
 su -
@@ -91,7 +94,6 @@ For this project, `apt` is sufficient for installing packages.
 ### 3.2 Users:
 
 Linux uses user accounts to manage access to files, programs, and system resources.
-
 Born2beRoot requires a regular user with the student's login as username, in addition to the root account.
 
 **Create a new user (as root):**
@@ -109,7 +111,6 @@ id <username>
 
 ### 3.3 Groups:
 Linux groups allow multiple users to share permissions without configuring each user individually.
-
 Born2beRoot requires a regular user to belong to two groups:
 
 - **sudo**:  Allows authorized users to execute commands with root privileges using `sudo`. Membership does not make the user root.
@@ -224,7 +225,6 @@ port 4242
 permitrootlogin no
 ```
 
-
 ### 4.2 Connecting via SSH
 
 To connect to the VM from the host computer, we need to configure **port forwarding** in VirtualBox.
@@ -303,7 +303,7 @@ To close the VM from the terminal on the host computer:
 sudo shutdown now
 ```
 
-**Note:** Although the terminal runs on the host computer, commands entered in this SSH session execute inside the VM. To be able to access the VM through the terminal, the VM needs to be running and unlocked. The moment the VM is shut down, the connection to the terminal will be close.
+**Note:** Although the terminal runs on the host computer, commands entered in this SSH session execute inside the VM. To be able to access the VM through the terminal, the VM needs to be running and unlocked. The moment the VM is shut down, the connection to the terminal will be closed.
 
 ## 5. UFW firewall
 
@@ -351,7 +351,7 @@ It is recommended to allow port `4242` **before enabling UFW**, especially when 
 **Check the firewall status and rules:**
 
 ```bash
-sudo ufw status verbose
+sudo ufw status
 ```
 
 The output should indicate that the firewall is active and port `4242` is allowed.
@@ -735,19 +735,127 @@ sudo pam-auth-update
 
 Make sure the password-quality profile is enabled.
 
-**Test password complexity enforcement:**
 
-When the account is eligible for a password change, run:
+## 8. Monitoring Script
+
+Born2beRoot requires a Bash script that displays system information on all logged-in terminals at startup and every 10 minutes.
+
+The implementation uses three components:
+
+- **Bash:** Collects and formats system information.
+- **`wall`:** Displays messages on the terminals of logged-in users.
+- **`cron`:** Executes the script automatically according to a schedule.
+
+### 8.1. Creating the Script
+
+Create the script as root:
 
 ```bash
-passwd
+nano /usr/local/bin/monitoring.sh
 ```
 
-Try entering a password that does not meet the requirements, such as one that is too short or contains no uppercase letters.
+The script collects the following information:
 
-The system should reject the password and display an error explaining why it does not meet the policy.
+| Information | Command or source | Description |
+|---|---|---|
+| Architecture | `uname -a` | Displays the operating system and kernel information. |
+| Physical processors | `lscpu` | Counts processor sockets visible to the VM. |
+| Virtual processors | `nproc --all` | Counts logical processors available to the VM. |
+| RAM usage | `free -m` | Displays memory usage and available memory in MB. |
+| Disk usage | `df` | Displays disk space and utilization. |
+| CPU usage | `/proc/stat` | Calculates CPU usage by comparing two measurements. |
+| Last reboot | `uptime -s` | Displays when the system last started. |
+| LVM | `lsblk` | Checks whether LVM logical volumes are present. |
+| Connections | `ss` | Counts established TCP connections. |
+| Users | `who` | Counts distinct users currently logged into terminals. |
+| Network | `ip` | Retrieves the VM's IPv4 and MAC addresses. |
+| Sudo | `grep` | Counts command entries in `born2beroot.log`. |
 
-The minimum password age of 2 days may prevent this test immediately after updating a password.
+The information is collected each time the script runs, ensuring that the displayed values reflect the current system state.
+
+The `wall` command broadcasts the results to logged-in terminals.
+
+**Make the script executable:**
+
+```bash
+chmod +x /usr/local/bin/monitoring.sh
+```
+
+**Test the script:**
+
+```bash
+/usr/local/bin/monitoring.sh
+```
+
+### 8.2. Scheduling with Cron
+
+`cron` is a Linux service that automatically executes commands at scheduled times. Its schedules are stored in crontabs.
+
+**Install and enable cron (as root):**
+
+```bash
+apt install cron
+systemctl enable --now cron
+```
+
+**Edit root's crontab:**
+
+```bash
+crontab -e
+```
+
+Add:
+
+```cron
+@reboot /usr/local/bin/monitoring.sh
+*/10 * * * * /usr/local/bin/monitoring.sh
+```
+
+- `@reboot`: Executes the script when cron starts, normally at system startup.
+- `*/10 * * * *`: Executes the script every 10 minutes.
+
+### 8.3. Verifying the Configuration
+
+**Verify the scheduled tasks:**
+
+```bash
+crontab -l
+```
+
+**Verify that cron is active:**
+
+```bash
+systemctl status cron
+```
+
+**Execute the script manually:**
+
+```bash
+/usr/local/bin/monitoring.sh
+```
+
+The monitoring information should appear on the terminals of logged-in users.
+
+### 8.4. Disabling the Monitoring Script
+
+The subject requires the script to be stopped during evaluation without modifying the script itself.
+
+**Temporarily disable its scheduled execution:**
+
+```bash
+crontab -e
+```
+
+Comment out both entries:
+
+```cron
+# @reboot /usr/local/bin/monitoring.sh
+# */10 * * * * /usr/local/bin/monitoring.sh
+```
+
+This prevents cron from launching the script again while keeping the script unchanged.
+
+The entries can be reactivated by removing the `#` characters.
 
 
 
@@ -761,17 +869,16 @@ The minimum password age of 2 days may prevent this test immediately after updat
 To create this project, the references and tools used were:
 
 - Linux man page [manual](https://linux.die.net/man/)
-- Stack Overflow [website](https://stackoverflow.com/questions)
 - Github [website](https://github.com/)
 - Born2BeRoot guide [website](https://noreply.gitbook.io/born2beroot)
 - Debian [Recommended Partitioning Scheme](https://www.debian.org/releases/trixie/amd64/apcs03.en.html)
 - Debian [Directory Tree](https://www.debian.org/releases/trixie/amd64/apcs02.en.html)
 - Debian [Disk Space Needed for Tasks](https://www.debian.org/releases/trixie/amd64/apds02.en.html)
 - Debian [Package Management](https://www.debian.org/doc/manuals/debian-reference/ch02)
-- Debian Wiki[sudo](https://wiki.debian.org/sudo)
+- Debian Wiki [sudo](https://wiki.debian.org/sudo)
 - Debian [sudoers Configuration Manual](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html)
 - Debian [visudo Manual](https://manpages.debian.org/trixie/sudo/visudo.8.en.html)
-- Debian Wiki[System Groups](https://wiki.debian.org/SystemGroups)
+- Debian Wiki [System Groups](https://wiki.debian.org/SystemGroups)
 - Debian Wiki [SSH](https://wiki.debian.org/SSH)
 - Debian [SSH Server Configuration Manual](https://manpages.debian.org/trixie/openssh-server/sshd_config.5.en.html)
 - Debian [SSH Client Manual](https://manpages.debian.org/trixie/openssh-client/ssh.1.en.html)
@@ -781,6 +888,10 @@ To create this project, the references and tools used were:
 - Debian [Password Quality Configuration](https://manpages.debian.org/trixie/libpwquality-common/pwquality.conf.5.en.html)
 - Debian [PAM Password Quality Module](https://manpages.debian.org/trixie/libpam-pwquality/pam_pwquality.8.en.html)
 - Debian [PAM Configuration](https://manpages.debian.org/trixie/libpam-runtime/pam-auth-update.8.en.html)
+- Debian [Cron Manual](https://manpages.debian.org/trixie/cron/crontab.5.en.html)
+- Debian [Crontab Manual](https://manpages.debian.org/trixie/cron/crontab.1.en.html)
+- Debian [Wall Manual](https://manpages.debian.org/trixie/bsdutils/wall.1.en.html)
+- Debian [Bash Manual](https://manpages.debian.org/trixie/bash/bash.1.en.html)
 
 
 
