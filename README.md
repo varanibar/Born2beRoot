@@ -1172,7 +1172,6 @@ This prevents cron from launching the script again while keeping the script unch
 The entries can be reactivated by removing the `#` characters.
 
 
-
 # RESOURCES
 
 ## References
