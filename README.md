@@ -304,7 +304,7 @@ Born2beRoot requires a regular user to belong to two groups:
 
 - **user42**: A custom group required by the project. It has no special privileges by default and demonstrates Linux group management.
 
-**Create a new group (as root):**
+**Create a new group:**
 
 ```bash
 addgroup <groupname>
@@ -316,7 +316,7 @@ addgroup <groupname>
 getent group <groupname>
 ```
 
-**Add a user to a group (as root):**
+**Add a user to a group:**
 
 ```bash
 adduser <username> <groupname>
@@ -334,7 +334,6 @@ getent group <groupname1> <groupname2>
 ```bash
 groups <username>
 ```
-Both `sudo` and `user42` should appear in the output.
 
 **Check all groups assigned to the current user:**
 
@@ -580,7 +579,7 @@ For Born2beRoot, instead of modifying `/etc/sudoers` directly, the configuration
 
 #### 6.1. Configuring Sudo
 
-**Create a directory for sudo logs (as root):**
+**Create a directory for sudo logs:**
 
 ```bash
 mkdir -p /var/log/sudo
@@ -641,16 +640,15 @@ Normally, a program running with root privileges can interact directly with the 
 
 The `use_pty` setting was chosen because running privileged commands in a separate terminal helps prevent this interference, while still allowing automated tasks to use `sudo` without an interactive terminal.
 
-#### 6.2. Verifying the Configuration
+#### 6.2. Verifying the Configuration (as regular user)
 
-After configuring `sudo`, the security settings must be verified. These checks are performed as the regular user to verify sudo permissions, password prompts, and logging for that account.
-
-**Verify sudo authentication and administrator privileges (as regular user):**
-
+After configuring `sudo`, the security settings must be verified. These checks are performed as the regular user to verify sudo permissions, password prompts, and logging for that account. Switch from root to the regular VM user:
 
 ```bash
 exit
 ```
+
+**Verify sudo authentication and administrator privileges:**
 
 First, clear any previous sudo authentication:
 
@@ -696,7 +694,6 @@ sudo whoami
 ```
 
 Enter an incorrect password three times.
-
 The custom error message should appear, and sudo should stop requesting passwords after three failed attempts.
 
 **Verify that sudo logs are being created:**
@@ -766,7 +763,7 @@ Sections 7.1–7.3 are performed as root to modify system configuration files an
 
 `/etc/login.defs` is a system configuration file that defines default settings for user accounts, including password expiration rules.
 
-**Configure password expiration (as root):**
+**Configure password expiration:**
 
 ```bash
 su -
@@ -793,7 +790,7 @@ These settings are applied by default when new accounts are created. Existing ac
 
 **Update existing users:**
 
-Before updating the settings, check their current values:
+Before updating the settings of the existing accounts, check their current values:
 
 ```bash
 chage -l varaniba
@@ -813,13 +810,16 @@ chage -M 30 -m 2 -W 7 root
 - `-m 2`: Minimum password age of 2 days.
 - `-W 7`: Warning period of 7 days.
 
+Check again the values of the settings to confirm that they were correctly updated.
+
 #### 7.2. Password Complexity
 
 Password complexity defines the requirements a new password must satisfy.
 
-Password complexity is enforced through **PAM (Pluggable Authentication Modules)**, a system that manages authentication in Linux. The `libpam-pwquality` package checks whether new passwords meet the configured security requirements.
+Password complexity is enforced through **PAM (Pluggable Authentication Modules)**, a system that manages authentication in Linux.
+The `libpam-pwquality` package checks whether new passwords meet the configured security requirements.
 
-**Install the package (as root):**
+**Install the package:**
 
 ```bash
 apt install libpam-pwquality
@@ -876,6 +876,7 @@ To change the password of the current user:
 ```bash
 passwd
 ```
+Change the passwords of both `root` and `varaniba`.
 
 **Password expiration restrictions:**
 
@@ -891,7 +892,7 @@ However, when root resets another user's password, the previous password is not 
 
 All existing accounts with passwords must be updated before completing the configuration.
 
-#### 7.4. Verifying the Password Policy
+#### 7.4. Verifying the Password Policy (as regular user)
 
 These checks are performed as the regular user, using `sudo` where root privileges are required.
 
@@ -945,9 +946,13 @@ Make sure the password-quality profile is enabled.
 
 ### 8. Monitoring Script
 
-Born2beRoot requires a Bash script that displays system information on all logged-in terminals at startup and every 10 minutes.
+Born2beRoot requires a Bash script named `monitoring.sh` that displays system information on all logged-in terminals at startup and every 10 minutes.
 
-This section is performed as root to create the script `monitoring.sh` in `/usr/local/bin`, access sudo logs, and manage root's crontab. From the regular VM user, switch to root:
+This section is performed as root because we need administrator privileges to create the monitoring script, access the protected sudo logs, and configure root's crontab.
+
+The `/usr/local/sbin/` directory is intended for locally installed system administration programs and scripts, making it an appropriate location for `monitoring.sh`.
+
+From the regular VM user, switch to root:
 
 ```bash
 su -
@@ -955,61 +960,146 @@ su -
 
 The implementation uses three components:
 
-- **Bash:** Collects and formats system information.
-- **`wall`:** Displays messages on the terminals of logged-in users.
-- **`cron`:** Executes the script automatically according to a schedule.
+- **Bash:** A command-line shell and scripting language used to execute commands. In this project, it collects and formats system information.
+- **`wall`:** A command that displays messages on the terminals of logged-in users.
+- **`cron`:** A service that automatically executes commands or scripts according to a schedule.
+
 
 #### 8.1. Creating the Script
 
-Create the script as root:
+Create the script:
 
 ```bash
-nano /usr/local/bin/monitoring.sh
+nano /usr/local/sbin/monitoring.sh
 ```
 
-The script collects the following information:
+The script collects the following information required by the subject:
 
 | Information | Command or source | Description |
 |---|---|---|
-| Architecture | `uname -a` | Displays the operating system and kernel information. |
-| Physical processors | `lscpu` | Counts processor sockets visible to the VM. |
-| Virtual processors | `nproc --all` | Counts logical processors available to the VM. |
-| RAM usage | `free -m` | Displays memory usage and available memory in MB. |
-| Disk usage | `df` | Displays disk space and utilization. |
-| CPU usage | `/proc/stat` | Calculates CPU usage by comparing two measurements. |
-| Last reboot | `uptime -s` | Displays when the system last started. |
-| LVM | `lsblk` | Checks whether LVM logical volumes are present. |
-| Connections | `ss` | Counts established TCP connections. |
-| Users | `who` | Counts distinct users currently logged into terminals. |
-| Network | `ip` | Retrieves the VM's IPv4 and MAC addresses. |
-| Sudo | `grep` | Counts command entries in `born2beroot.log`. |
+| Architecture | `uname -a` | Displays the operating system architecture and kernel version. |
+| CPU physical | `lscpu` | Shows the number of physical processors. |
+| vCPU | `/proc/cpuinfo` | Shows the number of virtual processors. |
+| Memory Usage | `free --mega` | Displays total and used RAM, and its usage percentage. |
+| Disk Usage | `df -m` | Displays total and used disk space, and its usage percentage. |
+| CPU load | `vmstat` | Calculates the current CPU usage percentage. |
+| Last boot | `uptime -s` | Displays the date and time of the last reboot. |
+| LVM use | `lsblk` | Checks whether LVM is being used. |
+| Connections TCP | `ss` | Counts active TCP connections, such as SSH connections. |
+| User log | `users` | Counts how many user sessions are currently logged into the VM. |
+| Network | `hostname -I`, `ip` | Displays the IPv4 and MAC addresses. |
+| Sudo | `grep` | Counts commands executed with sudo using the log file. |
 
-The information is collected each time the script runs, ensuring that the displayed values reflect the current system state.
+The script stores the collected information in variables and uses `wall` to display it on the virtual machine terminal. Each execution collects updated system information.
 
-The `wall` command broadcasts the results to logged-in terminals.
+**Note:** On Debian 13 (Trixie), `wall` may fail to display messages in SSH terminals because their terminal information is not correctly registered with `systemd-logind`. This issue is documented in [Debian's bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1115259).
+
+The script used is:
+
+```text
+#!/bin/bash
+
+# ARCHITECTURE
+arch=$(uname -a)
+
+# PROCESSORS
+cpuf=$(lscpu | awk '/Socket\(s\):/ {print $2}')
+cpuv=$(grep -c '^processor' /proc/cpuinfo)
+
+# RAM
+ram_total=$(free --mega | awk '/^Mem:/ {print $2}')
+ram_use=$(free --mega | awk '/^Mem:/ {print $3}')
+ram_percent=$(free --mega | awk '/^Mem:/ {printf "%.1f", $3/$2*100}')
+
+# DISK
+disk_total=$(df -m --total -x tmpfs -x devtmpfs | awk '$1=="total" {print $2}')
+disk_use=$(df -m --total -x tmpfs -x devtmpfs | awk '$1=="total" {print $3}')
+disk_percent=$(awk -v used="$disk_use" -v total="$disk_total" \
+    'BEGIN {if (total > 0) printf "%.1f", used/total*100; else print 0}')
+
+# CPU USAGE
+cpu_idle=$(vmstat 1 2 | tail -1 | awk '{print $15}')
+cpu_usage=$((100 - cpu_idle))
+
+# LAST BOOT
+last_boot=$(uptime -s)
+
+# LVM
+if lsblk -n -o TYPE | grep -q lvm; then
+    lvm="yes"
+else
+    lvm="no"
+fi
+
+# TCP CONNECTIONS
+connections=$(ss -tan state established | tail -n +2 | wc -l)
+
+# LOGGED-IN USERS
+users_count=$(who | awk '$2 != "seat0" {print $1}' | sort -u | wc -l)
+
+# NETWORK
+ip_address=$(hostname -I | awk '{print $1}')
+interface=$(ip -4 -o addr show scope global | awk 'NR==1 {print $2}')
+mac_address="N/A"
+
+if [ -n "$interface" ]; then
+    mac_address=$(cat "/sys/class/net/$interface/address")
+fi
+
+# SUDO COMMANDS
+sudo_count=$(grep -c 'COMMAND=' /var/log/sudo/born2beroot.log || true)
+
+# DISPLAY
+wall "	Architecture: $arch
+	CPU physical: $cpuf
+	vCPU: $cpuv
+	Memory Usage: $ram_use/${ram_total}MB ($ram_percent%)
+	Disk Usage: $disk_use/${disk_total}MB ($disk_percent%)
+	CPU load: $cpu_usage%
+	Last boot: $last_boot
+	LVM use: $lvm
+	Connections TCP: $connections ESTABLISHED
+	User log: $users_count
+	Network: IP $ip_address ($mac_address)
+	Sudo: $sudo_count commands"
+```
 
 **Make the script executable:**
 
 ```bash
-chmod +x /usr/local/bin/monitoring.sh
+chmod +x /usr/local/sbin/monitoring.sh
 ```
 
 **Test the script:**
 
 ```bash
-/usr/local/bin/monitoring.sh
+/usr/local/sbin/monitoring.sh
 ```
 
 #### 8.2. Scheduling with Cron
 
-`cron` is a Linux service that automatically executes commands at scheduled times. Its schedules are stored in crontabs.
+`cron` is a Linux service that automatically executes commands at scheduled times. Its schedules are stored in crontabs. This section is performed as root.
 
-**Install and enable cron (as root):**
+**Install and enable cron:**
 
 ```bash
 apt install cron
 systemctl enable --now cron
 ```
+
+The `enable --now` option configures cron to start automatically at boot and starts the service immediately.
+
+**Verify that cron is enabled and running:**
+
+```bash
+systemctl is-enabled cron
+systemctl is-active cron
+```
+
+- `is-enabled`: Should return `enabled`, confirming that cron will start automatically at boot.
+- `is-active`: Should return `active`, confirming that cron is currently running.
+
+Both conditions should be satisfied to ensure cron is running and will start automatically after rebooting the VM.
 
 **Edit root's crontab:**
 
@@ -1017,15 +1107,21 @@ systemctl enable --now cron
 crontab -e
 ```
 
-Add:
+The first time we run this command, cron may display `no crontab for root - using an empty one`, meaning root has no scheduled tasks yet.
+
+It will also ask us to select a text editor. Choose `1` for Nano.
+
+Add the following lines:
 
 ```cron
-@reboot /usr/local/bin/monitoring.sh
-*/10 * * * * /usr/local/bin/monitoring.sh
+@reboot /usr/local/sbin/monitoring.sh
+*/10 * * * * /usr/local/sbin/monitoring.sh
 ```
 
 - `@reboot`: Executes the script when cron starts, normally at system startup.
 - `*/10 * * * *`: Executes the script every 10 minutes.
+
+**Note:** Copying and pasting into Nano may not work directly through the VirtualBox console. Alternatively, connect to the VM through SSH and edit the crontab there.
 
 #### 8.3. Verifying the Configuration
 
@@ -1035,7 +1131,11 @@ Add:
 crontab -l
 ```
 
-**Verify that cron is active:**
+This displays the scheduled tasks for the current user. Since we are working as root, it shows root's crontab.
+
+The output should include the two entries for `monitoring.sh`.
+
+**Verify more detailed information:**
 
 ```bash
 systemctl status cron
@@ -1044,10 +1144,11 @@ systemctl status cron
 **Execute the script manually:**
 
 ```bash
-/usr/local/bin/monitoring.sh
+/usr/local/sbin/monitoring.sh
 ```
+This executes the script without waiting for cron, allowing us to verify that it collects and displays the system information.
 
-The monitoring information should appear on the terminals of logged-in users.
+The monitoring information should appear in the VirtualBox terminal.
 
 #### 8.4. Disabling the Monitoring Script
 
@@ -1062,8 +1163,8 @@ crontab -e
 Comment out both entries:
 
 ```cron
-# @reboot /usr/local/bin/monitoring.sh
-# */10 * * * * /usr/local/bin/monitoring.sh
+# @reboot /usr/local/sbin/monitoring.sh
+# */10 * * * * /usr/local/sbin/monitoring.sh
 ```
 
 This prevents cron from launching the script again while keeping the script unchanged.
