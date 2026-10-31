@@ -19,24 +19,26 @@ This project has been created as part of the 42 curriculum by *varaniba*
       - [3.3 Groups](#33-groups)
     - [4. SSH service](#4-ssh-service)
       - [4.1 Configuring SSH](#41-configuring-ssh)
-      - [4.2 Connecting via SSH](#42-connecting-via-ssh)
+      - [4.2. Verifying SSH Configuration](#42-verifying-ssh-configuration)
+      - [4.3 Connecting via SSH](#43-connecting-via-ssh)
     - [5. UFW firewall](#5-ufw-firewall)
       - [5.1. Installing UFW](#51-installing-ufw)
       - [5.2. Configuring UFW](#52-configuring-ufw)
       - [5.3. Verifying UFW Configuration](#53-verifying-ufw-configuration)
     - [6. Sudo Security Configuration](#6-sudo-security-configuration)
       - [6.1. Configuring Sudo](#61-configuring-sudo)
-      - [6.2. Verifying the Configuration](#62-verifying-the-configuration)
+      - [6.2. Verifying the Configuration (as regular user)](#62-verifying-the-configuration-as-regular-user)
     - [7. Password Policy](#7-password-policy)
       - [7.1. Password Expiration](#71-password-expiration)
       - [7.2. Password Complexity](#72-password-complexity)
       - [7.3. Updating Existing Passwords](#73-updating-existing-passwords)
-      - [7.4. Verifying the Password Policy](#74-verifying-the-password-policy)
+      - [7.4. Verifying the Password Policy (as regular user)](#74-verifying-the-password-policy-as-regular-user)
     - [8. Monitoring Script](#8-monitoring-script)
       - [8.1. Creating the Script](#81-creating-the-script)
       - [8.2. Scheduling with Cron](#82-scheduling-with-cron)
       - [8.3. Verifying the Configuration](#83-verifying-the-configuration)
       - [8.4. Disabling the Monitoring Script](#84-disabling-the-monitoring-script)
+    - [9. Creating Signature](#9-creating-signature)
 - [RESOURCES](#resources)
   - [References](#references)
   - [AI Use](#ai-use)
@@ -400,10 +402,24 @@ The modified lines must be uncommented.
 ```bash
 sudo sshd -t
 sudo service ssh restart
-sudo service ssh status
 ```
 
 The first command checks the configuration for errors. No output indicates that the syntax validation succeeded.
+
+#### 4.2. Verifying SSH Configuration
+
+**Check the SSH status:**
+
+```bash
+systemctl is-active ssh
+systemctl is-enabled ssh
+```
+
+For more details:
+
+```bash
+sudo service ufw status
+```
 
 **Verify the effective SSH configuration:**
 
@@ -418,7 +434,7 @@ port 4242
 permitrootlogin no
 ```
 
-#### 4.2 Connecting via SSH
+#### 4.3 Connecting via SSH
 
 To connect to the VM from the host computer, **port forwarding** must be configured in VirtualBox.
 
@@ -539,17 +555,24 @@ This creates a firewall rule allowing incoming connections through port `4242`, 
 sudo ufw enable
 ```
 
-It is recommended to allow port `4242` **before enabling UFW**, especially when configuring the VM through SSH. Otherwise, enabling the firewall could block the SSH connection.
+It is recommended to allow port `4242` **before enabling UFW**, especially when configuring the VM through SSH.
+Otherwise, enabling the firewall could block the SSH connection.
 
 #### 5.3. Verifying UFW Configuration
 
-**Check the firewall status and rules:**
+**Check the firewall status:**
 
 ```bash
 sudo ufw status
+sudo service ufw status
 ```
 
-The output should indicate that the firewall is active and port `4242` is allowed.
+The output should indicate `Status: active` and that port `4242` is allowed.
+For more details:
+
+```bash
+sudo service ufw status
+```
 
 
 ### 6. Sudo Security Configuration
@@ -1082,12 +1105,31 @@ chmod +x /usr/local/sbin/monitoring.sh
 
 **Install and enable cron:**
 
+Cron may already be installed on Debian, depending on the packages selected during installation. The following command ensures it is installed:
+
 ```bash
 apt install cron
+```
+
+**Enable and start the cron service:**
+
+```bash
 systemctl enable --now cron
 ```
 
-The `enable --now` option configures cron to start automatically at boot and starts the service immediately.
+`systemctl` is used to manage system services. This command performs two actions:
+
+- `enable`: Configures cron to start automatically whenever the system boots.
+- `--now`: Also starts cron immediately, without requiring a reboot.
+
+Without `--now`, `enable` would only configure automatic startup and would not start the service immediately.
+
+This command is equivalent to running:
+
+```bash
+systemctl enable cron
+systemctl start cron
+```
 
 **Verify that cron is enabled and running:**
 
@@ -1096,10 +1138,9 @@ systemctl is-enabled cron
 systemctl is-active cron
 ```
 
-- `is-enabled`: Should return `enabled`, confirming that cron will start automatically at boot.
-- `is-active`: Should return `active`, confirming that cron is currently running.
+- `enabled`: Confirms that cron is configured to start automatically at boot.
+- `active`: Confirms that cron is currently running.
 
-Both conditions should be satisfied to ensure cron is running and will start automatically after rebooting the VM.
 
 **Edit root's crontab:**
 
@@ -1171,6 +1212,42 @@ This prevents cron from launching the script again while keeping the script unch
 
 The entries can be reactivated by removing the `#` characters.
 
+### 9. Creating Signature
+
+A **signature** is a unique value calculated from the contents of a file using a hashing algorithm. For Born2beRoot, we use SHA-1 to generate a signature of the VM's virtual disk (`.vdi` file).
+
+The signature is used to verify that the virtual disk presented during evaluation matches the one submitted for the project.
+
+**Shut down the virtual machine:**
+
+Before generating the signature, shut down the VM completely:
+
+```bash
+sudo shutdown -h now
+```
+
+- `-h`: Halts the system and normally powers it off.
+- `now`: Starts the shutdown immediately.
+
+This command is executed inside Debian to safely shut down the VM before calculating its signature.
+
+**Locate the virtual disk:**
+
+Navigate to the directory containing the `.vdi` file and run:
+
+```bash
+sha1sum <virtual_disk_name>.vdi
+```
+
+The output contains a 40-character SHA-1 hash followed by the filename. For this project:
+
+```bash
+sha1sum Born2beRoot.vdi
+```
+
+**Create `signature.txt`:**
+
+Create a file named `signature.txt` at the root of the project's Git repository and paste only the SHA-1 hash into it, without the `.vdi` filename.
 
 # RESOURCES
 
