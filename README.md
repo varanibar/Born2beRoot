@@ -1,6 +1,6 @@
 This project has been created as part of the 42 curriculum by *varaniba*
 
-## Table of contents
+### Table of contents
 
 - [DESCRIPTION](#description)
   - [Debian vs Rocky Linux](#debian-vs-rocky-linux)
@@ -9,7 +9,7 @@ This project has been created as part of the 42 curriculum by *varaniba*
   - [VirtualBox vs UTM](#virtualbox-vs-utm)
 - [INSTRUCTIONS](#instructions)
   - [Command reference](#command-reference)
-  - [Setup](#setup)
+  - [Project description](#project-description)
     - [Preparation](#preparation)
     - [1. Create the virtual machine](#1-create-the-virtual-machine)
     - [2. Operating System installation](#2-operating-system-installation)
@@ -49,153 +49,180 @@ This project consists of setting up a server by following specific rules. A mini
 
 ## Debian vs Rocky Linux
 
-Both are community-maintained Linux distributions suitable for running a server without a graphical interface. Their main differences for this project are the package management tools and security configuration.
+Both [Debian](https://www.debian.org/intro/about) and [Rocky Linux](https://rockylinux.org/) are free, community-maintained Linux distributions that can be used to run servers without a graphical interface.
+
+Their main differences for Born2beRoot are their intended use, package management tools, and security systems.
 
 | Debian | Rocky Linux |
 |---|---|
-| Independent distribution with a broad range of desktop and server software. | Enterprise distribution designed for compatibility with Red Hat Enterprise Linux (RHEL). |
-| Uses `.deb` packages, managed with tools such as `apt` and `dpkg`. | Uses RPM packages, managed with tools such as `dnf` and `rpm`. |
-| Uses AppArmor by default. | Commonly uses SELinux for mandatory access control. |
+| General-purpose distribution used for personal computers, servers, and development. | Distribution mainly focused on servers and enterprise environments, where stability and long-term support are important. |
+| Uses [`.deb` packages](https://www.debian.org/doc/manuals/debian-faq/pkg-basics.en.html), managed with tools such as `apt`. | Uses [`.rpm` packages](https://docs.rockylinux.org/guides/package_management/dnf_package_manager/), managed with tools such as `dnf`. |
+| Uses AppArmor for additional security. | Uses SELinux for additional security. |
 
-Debian 13 was selected for this project because its documentation and package management tools provide an accessible starting point for learning system administration. Rocky Linux provides an alternative for learning the RHEL ecosystem. Sources: [Debian](https://www.debian.org/intro/why_debian.html), [Rocky Linux](https://rockylinux.org/), and [DNF documentation](https://docs.rockylinux.org/guides/package_management/dnf_package_manager/).
+**Debian 13 (Trixie)** was selected for this project because it has extensive [documentation](https://www.debian.org/doc/) and straightforward package management tools, making it a suitable starting point for learning Linux system administration.
+
 
 ## AppArmor vs SELinux
 
-Both provide **mandatory access control (MAC)**: security policies restrict what a process can access in addition to standard Linux ownership and permission checks. Their purpose is to limit the damage a compromised application can cause.
+[AppArmor](https://apparmor.net/) and [SELinux](https://docs.rockylinux.org/guides/security/learning_selinux/) are Linux security systems that control what programs are allowed to access or do.
+
+Both use **[Mandatory Access Control (MAC)](https://csrc.nist.gov/glossary/term/mandatory_access_control)**, which adds security rules beyond normal Linux file permissions. These rules help limit the damage if a program is compromised.
 
 | AppArmor | SELinux |
 |---|---|
-| Uses application profiles, with file access rules primarily based on paths. | Uses security labels assigned to processes and resources, with policies defining permitted interactions. |
-| Profiles describe permitted access to files and other resources for a confined application. | Policies control access according to security contexts, including process and file types. |
-| Enforce mode blocks policy violations; complain mode primarily logs them. | Enforcing mode blocks policy violations; permissive mode logs them without blocking them. |
+| Uses [profiles](https://wiki.apparmor.net/profiles/profile-types-and-syntax/) that define what each program is allowed to access. | Uses [security labels](https://docs.rockylinux.org/guides/security/learning_selinux/) assigned to programs and files, with rules that determine which actions are allowed. |
+| Mainly uses file paths, such as `/etc/passwd`, to control access. | Mainly uses security labels to control access to files and other resources. |
+| **Enforce mode:** Blocks actions that violate security rules. **Complain mode:** Generally allows these actions but records the violations. | **Enforcing mode:** Blocks actions that violate security rules. **Permissive mode:** Allows these actions but records the violations. |
 
-This project uses AppArmor, which is enabled by default on Debian. Protection depends on the profiles loaded and their modes; enabling AppArmor does not mean every application is confined. Sources: [AppArmor documentation](https://apparmor.net/), [AppArmor on Debian](https://wiki.debian.org/AppArmor/HowToUse), and [Rocky Linux SELinux documentation](https://docs.rockylinux.org/guides/security/learning_selinux/).
+**Example:**
+
+Imagine a web server tries to read a protected file.
+
+- **AppArmor:** Checks the web server's profile to see whether it can access the file's path.
+- **SELinux:** Checks the security labels of the web server and the file to determine whether access is allowed.
+
+For this project, we use AppArmor, which is [enabled by default on Debian](https://wiki.debian.org/AppArmor/HowToUse).
+
+However, AppArmor only restricts programs covered by active security profiles. Enabling AppArmor does not automatically mean every program is protected.
 
 ## UFW vs firewalld
 
-Both are tools for managing the Linux kernel's firewall rules. They control network traffic, while AppArmor and SELinux control application access to system resources.
+[UFW (Uncomplicated Firewall)](https://manpages.debian.org/trixie/ufw/ufw.8.en.html) and [firewalld](https://firewalld.org/documentation/) are Linux tools used to manage firewall rules. A firewall controls incoming and outgoing network traffic, allowing or blocking connections based on security rules.
+
+Unlike AppArmor and SELinux, which control what programs can access, UFW and firewalld control network connections.
 
 | UFW | firewalld |
 |---|---|
-| Provides a simple interface for allowing or denying traffic by port, protocol, or address. | Organizes rules using zones that represent different levels of network trust. |
-| Managed with the `ufw` command. | Managed with tools such as `firewall-cmd`. |
-| Suits a small set of host firewall rules. | Supports zone-based configuration and separates runtime changes from permanent settings. |
+| Mainly designed to make firewall configuration simple. | Provides more options for managing firewall rules across different networks. |
+| Uses the `ufw` command to allow or block connections based on ports, protocols, or IP addresses. | Uses the [`firewall-cmd`](https://firewalld.org/documentation/utilities/firewall-cmd.html) command to manage firewall rules. |
+| Manages rules directly, such as allowing SSH connections through port `4242`. | Uses [zones](https://firewalld.org/documentation/zone/use-of-zones) to apply different rules depending on the network, such as a home network or public Wi-Fi. |
 
-This project uses UFW to configure the required SSH access on port `4242`. Its command syntax suits the small number of rules needed for this VM. Sources: [Ubuntu firewall documentation](https://ubuntu.com/server/docs/firewalls/) and [firewalld documentation](https://firewalld.org/documentation/index.html).
 
 ## VirtualBox vs UTM
 
-Both can host a virtual machine, allowing Debian to run with its own virtual disk, memory allocation, processors, and network configuration.
+[VirtualBox](https://www.virtualbox.org/) and [UTM](https://docs.getutm.app/) are programs used to create and run virtual machines (VMs). They allow us to install another operating system, such as Debian, without replacing the operating system of our computer.
+
+Both allow us to configure the VM's memory, processors, storage, and network settings.
 
 | VirtualBox | UTM |
 |---|---|
-| Provides desktop virtualization on supported Windows, Linux, and macOS hosts. | Provides virtualization and emulation on Apple platforms, including macOS. |
-| Includes VM resource settings and NAT port forwarding used in this setup. | Supports QEMU-based virtualization and emulation, with an Apple Virtualization backend also available on macOS. |
-| Host and guest architecture support depends on the VirtualBox version and platform. | Can virtualize a matching CPU architecture or emulate a different one through QEMU. |
+| Available for Windows, Linux, and macOS. | Mainly available for macOS and iOS. |
+| Mainly uses virtualization to run operating systems compatible with the host computer's processor architecture. | Supports both virtualization and emulation, allowing it to run operating systems designed for different processor architectures. |
 
-Virtualization runs a compatible guest using hardware acceleration. Emulation can reproduce another CPU architecture but generally has greater overhead. The guest ISO must therefore match the chosen platform and execution mode.
 
-This project uses VirtualBox, following the referenced installation guide. UTM is an alternative on macOS, particularly when working with Apple Silicon and ARM guest images. Sources: [VirtualBox documentation](https://docs.oracle.com/en/virtualization/virtualbox/7.1/user/Introduction.html), [UTM documentation](https://docs.getutm.app/), and [UTM architecture settings](https://docs.getutm.app/settings-qemu/system/).
+**Virtualization vs emulation:**
 
+- **Virtualization:** Uses the host computer's processor to run a compatible operating system, usually with better performance.
+- **Emulation:** Simulates a different processor architecture, allowing software designed for another type of processor to run, usually with lower performance.
+
+
+For this project, we use **VirtualBox** because it is compatible with our Linux host computer and provides the tools needed to configure our Debian VM.
 
 
 # INSTRUCTIONS
 
 ## Command reference
 
-A list of commands grouped by setup section, with detailed explanations in the sections below.
+This section lists the main commands used in Born2beRoot, grouped by setup section. Detailed explanations are provided in the corresponding sections below.
 
-Commands marked with `sudo` are run as the regular VM user. Administrative commands without `sudo` are run in a root shell, as indicated in the linked sections. Values in angle brackets are placeholders.
+Commands with `sudo` are generally executed as the regular user, while administrative commands without `sudo` are executed from a root shell (`su -`).
 
-**[3. Virtual Machine configuration](#3-virtual-machine-configuration)**
+Values inside angle brackets (`< >`) are placeholders that must be replaced with the appropriate values.
 
-- `su -` → Switch to root and load root's login environment.
-- `exit` → Leave the current shell; return from root to the previous user, or log out of a login session.
-- `apt update` → Update the available package lists.
+**[3. Virtual Machine Configuration](#3-virtual-machine-configuration)**
+
+- `su -` → Switch to root and load its login environment.
+- `exit` → Exit the current shell and return to the previous user, or log out.
+- `apt update` → Refresh the list of available software packages.
 - `apt install sudo` → Install sudo.
-- `sudo -V` → Display the sudo version and configuration information.
-- `adduser <username>` → Create a user account.
+- `sudo -V` → Display the installed sudo version and configuration.
+- `adduser <username>` → Create a new user account.
 - `id <username>` → Display a user's ID and group memberships.
-- `addgroup <groupname>` → Create a group.
-- `getent group <groupname>` → Display a group's entry and listed members.
-- `adduser <username> <groupname>` → Add a user to a group.
-- `getent group <groupname1> <groupname2>` → Display entries for multiple groups.
-- `groups <username>` → Display the groups assigned to a specified user.
-- `groups` → Display the current user's active groups.
+- `addgroup <groupname>` → Create a new group.
+- `adduser <username> <groupname>` → Add a user to an existing group.
+- `getent group <groupname>` → Display a group's information and listed members.
+- `getent group <groupname1> <groupname2>` → Display information for multiple groups.
+- `groups <username>` → Display the groups assigned to a user.
+- `groups` → Display the groups of the current process.
 
-**[4. SSH service](#4-ssh-service)**
+**[4. SSH Service](#4-ssh-service)**
 
 - `sudo apt install openssh-server` → Install the SSH server.
-- `sudo service ssh status` → Check the SSH service status.
+- `sudo service ssh status` → Check whether the SSH service is running.
 - `sudo nano /etc/ssh/sshd_config` → Edit the SSH server configuration.
-- `sudo sshd -t` → Check the SSH configuration for errors.
-- `sudo service ssh restart` → Restart the SSH service to apply changes.
-- `sudo sshd -T | grep -E '^(port|permitrootlogin) '` → Display the effective SSH port and root-login settings.
-- `ssh <username>@localhost -p <hostport>` → Connect from the host computer through the forwarded SSH port; this project uses `ssh varaniba@localhost -p 4243`.
-- `sudo shutdown now` → Shut down the VM when run inside its console or SSH session.
+- `sudo sshd -t` → Check the SSH configuration for syntax errors.
+- `sudo service ssh restart` → Restart SSH to apply configuration changes.
+- `sudo sshd -T | grep -E '^(port|permitrootlogin) '` → Verify the active SSH port and root-login settings.
+- `ssh <username>@localhost -p <hostport>` → Connect to the VM from the host computer using the forwarded port. For this project: `ssh varaniba@localhost -p 4243`.
 
-**[5. UFW firewall](#5-ufw-firewall)**
+**[5. UFW Firewall](#5-ufw-firewall)**
 
-- `sudo apt install ufw` → Install UFW.
-- `sudo ufw status` → Display the firewall status and active rules.
-- `sudo ufw allow 4242` → Allow incoming traffic on port 4242.
-- `sudo ufw enable` → Enable the firewall.
+- `sudo apt install ufw` → Install the UFW firewall tool.
+- `sudo ufw status` → Display the firewall status and configured rules.
+- `sudo ufw allow 4242` → Allow incoming connections through port 4242.
+- `sudo ufw enable` → Activate the firewall.
 
 **[6. Sudo Security Configuration](#6-sudo-security-configuration)**
 
-- `mkdir -p /var/log/sudo` → Create the sudo log directory if needed.
+- `mkdir -p /var/log/sudo` → Create the sudo logging directory if it does not exist.
 - `visudo -f /etc/sudoers.d/born2beroot` → Edit the project's sudo configuration with syntax checking.
 - `visudo -c` → Check the sudoers configuration for syntax errors.
-- `sudo -k` → Invalidate cached sudo authentication so the next password-protected command requests authentication again.
+- `sudo -k` → Clear cached sudo authentication so the next authenticated sudo command requires a password.
 - `whoami` → Display the current effective username.
-- `sudo whoami` → Verify that sudo executes the command as root.
-- `sudo ls -la /var/log/sudo` → List sudo log files and recording directories, including hidden entries and file details.
-- `sudo cat /var/log/sudo/born2beroot.log` → Display the sudo command log.
+- `sudo whoami` → Confirm that sudo runs commands as root.
+- `sudo -l` → Display the current user's sudo permissions and applicable settings.
+- `sudo ls -la /var/log/sudo` → List sudo log files and recording directories.
+- `sudo cat /var/log/sudo/born2beroot.log` → Read the log of sudo commands.
 - `sudo sudoreplay -d /var/log/sudo -l` → List recorded sudo sessions.
 - `sudo sudoreplay -d /var/log/sudo <session_id>` → Replay a recorded sudo session.
-- `sudo -l` → Display the user's permitted sudo commands and applicable defaults.
 
 **[7. Password Policy](#7-password-policy)**
 
-- `nano /etc/login.defs` → Edit default password aging settings for new accounts.
-- `chage -l <username>` → Display an account's password aging settings; use `sudo` when checking another account as the regular user.
-- `chage -M 30 -m 2 -W 7 <username>` → Set the maximum password age to 30 days, minimum age to 2 days, and warning period to 7 days.
-- `apt install libpam-pwquality` → Install the PAM password-quality module.
-- `nano /etc/security/pwquality.conf` → Edit password complexity requirements.
+- `nano /etc/login.defs` → Edit the default password expiration settings for new accounts.
+- `chage -M 30 -m 2 -W 7 <username>` → Set a password's maximum age to 30 days, minimum age to 2 days, and expiration warning to 7 days.
+- `chage -l <username>` → Display an account's password expiration settings.
+- `apt install libpam-pwquality` → Install the password-quality checking module.
+- `nano /etc/security/pwquality.conf` → Configure password complexity requirements.
 - `passwd` → Change the current user's password.
-- `passwd varaniba` → Reset `varaniba`'s password as root.
-- `grep -E '^[[:space:]]*(minlen|ucredit|lcredit|dcredit|maxrepeat|usercheck|difok|enforce_for_root)' /etc/security/pwquality.conf` → Display the configured password-quality settings.
-- `grep -E '^[[:space:]]*password.*pam_pwquality\.so' /etc/pam.d/common-password` → Check for an active PAM password-quality entry.
-- `sudo pam-auth-update` → Open the PAM profile configuration tool.
+- `passwd varaniba` → Change the password of `varaniba` when executed as root.
+- `grep -E '^[[:space:]]*(minlen|ucredit|lcredit|dcredit|maxrepeat|usercheck|difok|enforce_for_root)' /etc/security/pwquality.conf` → Display the configured password-quality rules.
+- `grep -E '^[[:space:]]*password.*pam_pwquality\.so' /etc/pam.d/common-password` → Verify that the password-quality module is enabled in PAM.
+- `sudo pam-auth-update` → Open the PAM configuration tool.
 
 **[8. Monitoring Script](#8-monitoring-script)**
 
-- `nano /usr/local/bin/monitoring.sh` → Create or edit the monitoring script.
-- `chmod +x /usr/local/bin/monitoring.sh` → Make the script executable.
-- `/usr/local/bin/monitoring.sh` → Run the script manually.
-- `apt install cron` → Install cron.
-- `systemctl enable --now cron` → Enable cron at startup and start it immediately.
-- `crontab -e` → Edit the current user's crontab; run as root to manage the monitoring schedule.
-- `crontab -l` → Display the current user's crontab.
-- `systemctl status cron` → Check the cron service status.
+- `nano /usr/local/sbin/monitoring.sh` → Create or edit the monitoring script.
+- `chmod +x /usr/local/sbin/monitoring.sh` → Make the script executable.
+- `/usr/local/sbin/monitoring.sh` → Run the monitoring script manually.
+- `apt install cron` → Install the cron task scheduler.
+- `systemctl enable --now cron` → Start cron immediately and enable it at system startup.
+- `crontab -e` → Edit the current user's scheduled tasks. Run as root to configure the monitoring schedule.
+- `crontab -l` → Display the current user's scheduled tasks.
+- `systemctl status cron` → Check whether the cron service is running.
 
 **System information used by the monitoring script**
 
-- `uname -a` → Display kernel and system information.
-- `lscpu` → Display CPU information, including processor sockets visible to the VM.
-- `nproc --all` → Display the number of installed logical processors.
-- `free -m` → Display memory and swap usage in MiB.
-- `df` → Display filesystem space usage.
-- `/proc/stat` → Source of CPU counters used to calculate usage; this is a file, not a command.
-- `uptime -s` → Display the system startup time.
-- `lsblk` → Display block devices, including LVM logical volumes.
-- `ss` → Display socket information used to count established TCP connections.
-- `who` → List logged-in terminal sessions.
-- `ip` → Display network information, including IP and MAC addresses.
-- `grep` → Match log entries used to count sudo commands.
-- `wall` → Broadcast the monitoring output to logged-in terminals.
+- `uname -a` → Display the operating system and kernel information.
+- `lscpu` → Display CPU information, including the number of processor sockets.
+- `grep -c '^processor' /proc/cpuinfo` → Count the logical processors available to the VM.
+- `free --mega` → Display memory usage in megabytes.
+- `df -m --total -x tmpfs -x devtmpfs` → Display disk usage in MiB, excluding temporary filesystems.
+- `vmstat 1 2` → Collect CPU statistics used to calculate CPU usage.
+- `uptime -s` → Display the date and time of the last system startup.
+- `lsblk` → Display storage devices and logical volumes.
+- `ss -tan state established` → Display established TCP connections.
+- `users` → Display usernames associated with logged-in sessions.
+- `hostname -I` → Display the VM's IP addresses.
+- `ip -4 -o addr show scope global` → Display network interfaces with global IPv4 addresses.
+- `grep -c 'COMMAND=' /var/log/sudo/born2beroot.log` → Count recorded sudo commands.
+- `wall` → Broadcast the monitoring information to logged-in terminals.
 
-## Setup
+**[9. Creating Signature](#9-creating-signature)**
+
+- `sudo shutdown -h now` → Safely shut down the VM before calculating its signature.
+- `sha1sum <virtual_disk_name>.vdi` → Calculate the SHA-1 hash of the virtual disk from the host computer.
+
+## Project description
 
 The initial steps, [1. Create the virtual machine](#1-create-the-virtual-machine) and [2. Operating System installation](#2-operating-system-installation), follow the [Born2beRoot guide](https://noreply.gitbook.io/born2beroot). Refer to that guide for detailed installation and partitioning steps. Starting with [3. Virtual Machine configuration](#3-virtual-machine-configuration), the sections document the configuration used for this project, explain the choices made, and describe the commands used to configure and verify the system.
 
@@ -206,7 +233,7 @@ The initial steps, [1. Create the virtual machine](#1-create-the-virtual-machine
 - **External storage:** Not needed if the VM is stored in the sgoinfre directory.
 
 ### 1. Create the virtual machine:
-Using VirtualBox, create a new virtual machine and configure the following resources:
+Using [VirtualBox](https://docs.oracle.com/en/virtualization/virtualbox/7.1/user/Introduction.html), create a new virtual machine and configure the following resources:
 
 | Resource | Configuration | Justification |
 |---|---|---|
@@ -221,9 +248,9 @@ The installation must follow these requirements:
 - **No graphical interface:** Install Debian without a desktop environment, as required by the subject.
 - **Hostname:** varaniba42 — student login followed by 42.
 - **Username:** varaniba — student login.
-- **Disk partitioning:** Use manual partitioning to create the required partitions and mount points. Partition sizes must be chosen to provide sufficient space for the operating system and services while avoiding unnecessary disk allocation.
+- **Disk partitioning:** Use [manual partitioning](https://www.debian.org/releases/trixie/amd64/apcs03.en.html) to create the required partitions and mount points. Partition sizes must be chosen to provide [sufficient space for the operating system and services](https://www.debian.org/releases/trixie/amd64/apcs01.en.html) while avoiding unnecessary disk allocation.
 
-The following table lists the partition sizes chosen for this VM and explains their purpose. For the steps to configure encrypted storage and LVM, refer to the guide linked above.
+The following table lists the partition sizes chosen for this VM and explains [their purpose](https://www.debian.org/releases/trixie/amd64/apcs02.en.html). For the steps to configure encrypted storage and LVM, refer to the guide linked above.
 
 | Partition | Size | Justification |
 |-----------|------|---------------|
@@ -244,16 +271,21 @@ Launch the virtual machine and log in with the user created during installation.
 
 #### 3.1 Sudo:
 
-**sudo (superuser do)** allows authorized users to execute commands with root privileges without logging in as root.
+**[sudo (superuser do)](https://manpages.debian.org/trixie/sudo/sudo.8.en.html)** allows authorized users to execute commands with root privileges without logging in as root.
 - **Root:** Has full administrative privileges. Commands can be executed without sudo.
 - **Regular user:** Has limited permissions and must use sudo for administrative tasks, provided the user has been granted permission.
 
-**Install sudo:**
+**Switch to root:**
 
-Switch to root user `su`, the `-` loads root's login environment:
+Switch to root user [`su`](https://manpages.debian.org/trixie/util-linux/su.1.en.html), the `-` loads root's login environment:
 ```bash
 su -
 ```
+Both `su` and `su -` switch to the root user, but `su -` also loads root's login environment and changes to root's home directory (`/root`).
+
+This includes root's `PATH`, which defines where Bash searches for commands. For example, `ufw` is located in `/usr/sbin/`, a directory that may not be included in a regular user's `PATH`.
+
+Using `su -` ensures that administrative commands can be found without needing to use `sudo` while already logged in as root.
 
 Remain in this root shell for the rest of section 3 to install sudo and manage users and groups.
 
@@ -264,28 +296,41 @@ apt install sudo
 ```
 
 **Verify the installation:**
+
 Once the installation finishes, sudo is installed and available immediately. No reboot or logout is required, the installation can be verified:
 ```bash
 sudo -V
 ```
+
+
 **Difference between `apt` and `aptitude`:**
 
-Both are package managers used to install, update, and remove software on Debian.
+Both are [package managers](https://www.debian.org/doc/manuals/debian-reference/ch02) used to install, update, and remove software on Debian. They also manage **dependencies**, which are other packages a program needs to work.
 
 | `apt` | `aptitude` |
 |---|---|
-| Primarily command-line based | Command-line and interactive text interface |
-| Simple package and dependency management | More advanced dependency resolution options |
-| Suitable for everyday package management | Useful for managing more complex package conflicts |
+| Mainly used by typing commands. | Can be used with commands or through an interactive menu in the terminal. |
+| Automatically installs the dependencies a package needs. | Also manages dependencies, but can suggest different solutions when packages conflict. |
+| Easier to use for everyday tasks. | Offers more options for managing packages. |
 
-For this project, `apt` is sufficient for installing packages.
+**Example:** If we want to install `sudo`, both commands work:
+
+```bash
+apt install sudo
+aptitude install sudo
+```
+
+The difference becomes more noticeable when packages have conflicting dependencies. While `apt` may report that it cannot complete an installation, `aptitude` can suggest alternatives, such as installing a different package version or removing a conflicting package.
+
+For Born2beRoot, `apt` is sufficient because we only need to install and manage a few packages.
+
 
 #### 3.2 Users:
 
-Linux uses user accounts to manage access to files, programs, and system resources.
+Linux uses [user accounts](https://www.debian.org/doc/manuals/debian-reference/ch04.en.html) to manage access to files, programs, and system resources.
 Born2beRoot requires a regular user with the student's login as username, in addition to the root account.
 
-**Create a new user (as root):**
+**[Create a new user](https://manpages.debian.org/trixie/adduser/adduser.8.en.html):**
 ```bash
 adduser <username>
 ```
@@ -299,10 +344,10 @@ id <username>
 ```
 
 #### 3.3 Groups:
-Linux groups allow multiple users to share permissions without configuring each user individually.
+Linux [groups](https://wiki.debian.org/SystemGroups) allow multiple users to share permissions without configuring each user individually.
 Born2beRoot requires a regular user to belong to two groups:
 
-- **sudo**:  Allows authorized users to execute commands with root privileges using `sudo`. Membership does not make the user root.
+- **[sudo](https://wiki.debian.org/sudo)**:  Allows authorized users to execute commands with root privileges using `sudo`. Membership does not make the user root.
 
 - **user42**: A custom group required by the project. It has no special privileges by default and demonstrates Linux group management.
 
@@ -344,7 +389,7 @@ groups
 ```
 
 ### 4. SSH service
-**SSH (Secure Shell)** is a network protocol that allows secure, encrypted remote access to another machine through a terminal.
+**[SSH (Secure Shell)](https://wiki.debian.org/SSH)** is a network protocol that allows secure, encrypted remote access to another machine through a terminal.
 For Born2beRoot, SSH provides access to the Debian virtual machine from the host computer without using the VirtualBox console.
 
 This section is performed as the regular user, using `sudo` to give individual administrative commands root privileges. If the root shell from section 3 is still active, return to the regular user:
@@ -362,8 +407,15 @@ If the user has just been added to the `sudo` group, log out of the regular user
 ```bash
 sudo apt install openssh-server
 ```
-The `openssh-server` package allows the VM to accept incoming SSH connections.
 
+The [openssh-server package](https://packages.debian.org/trixie/openssh-server) installs `sshd`, which allows our VM to receive SSH connections.
+
+**Difference between `ssh` and `sshd`:**
+
+- **`ssh` [(SSH client)](https://manpages.debian.org/trixie/openssh-client/ssh.1.en.html):** The program used to connect to another machine. For example, we use the command `ssh varaniba@localhost -p 4243` from our host computer to connect to the VM.
+- **`sshd` [(SSH server)](https://manpages.debian.org/trixie/openssh-server/sshd.8.en.html#DESCRIPTION):** A program that runs in the background on our VM, waiting for incoming SSH connections and handling them.
+
+In short, `ssh` initiates the connection, while `sshd` accepts and manages it.
 
 **Check the SSH service status:**
 
@@ -380,7 +432,7 @@ By default, SSH uses port `22`. Born2beRoot requires:
 - SSH to run on port `4242`.
 - Root login through SSH to be disabled.
 
-Edit the SSH server configuration file:
+Edit the [SSH server configuration file](https://manpages.debian.org/trixie/openssh-server/sshd_config.5.en.html):
 
 ```bash
 sudo nano /etc/ssh/sshd_config
@@ -392,19 +444,28 @@ Port 4242
 PermitRootLogin no
 ```
 
-- `Port 4242`: Changes the port on which the SSH server listens.
-- `PermitRootLogin no`: Prevents the root account from connecting through SSH, regardless of the authentication method.
+- [Port](https://manpages.debian.org/trixie/openssh-server/sshd_config.5.en.html#Port) 4242: Changes the port on which the SSH server listens.
+- [PermitRootLogin](https://manpages.debian.org/trixie/openssh-server/sshd_config.5.en.html#PermitRootLogin) no: Prevents the root account from connecting through SSH, regardless of the authentication method.
 
 The modified lines must be uncommented.
 
-**Validate and restart SSH:**
+**Validate the SSH configuration:**
 
 ```bash
 sudo sshd -t
+```
+
+The [`sshd -t`](https://manpages.debian.org/trixie/openssh-server/sshd.8.en.html#t) command checks the SSH server configuration for errors. If the configuration is valid, no output is displayed. Otherwise, an error message appears.
+
+**Restart the SSH service:**
+
+Once the configuration has been validated successfully, restart SSH:
+
+```bash
 sudo service ssh restart
 ```
 
-The first command checks the configuration for errors. No output indicates that the syntax validation succeeded.
+This restarts the SSH service, which manages the `sshd` program, so the changes to its configuration take effect.
 
 #### 4.2. Verifying SSH Configuration
 
@@ -436,7 +497,7 @@ permitrootlogin no
 
 #### 4.3 Connecting via SSH
 
-To connect to the VM from the host computer, **port forwarding** must be configured in VirtualBox.
+To connect to the VM from the host computer, **[port forwarding](https://docs.oracle.com/en/virtualization/virtualbox/7.1/user/networkingdetails.html#natforward)** must be configured in VirtualBox.
 
 With the VM using NAT networking, go to:
 
@@ -494,10 +555,10 @@ Breaking down the command:
 - `ssh`: Starts an SSH connection.
 - `varaniba`: The user account on the VM.
 - `localhost`: Refers to the host computer, where the forwarding rule is configured.
-- `-p 4243`: Specifies the host port used for the connection.
+- [`-p 4243`](https://manpages.debian.org/trixie/openssh-client/ssh.1.en.html#p): Specifies the host port used for the connection.
 
 VirtualBox forwards the connection from the host's port `4243` to the VM's port `4242`.
-On the first connection, SSH may request verification of the server's host key. Once accepted, enter the Debian user's password.
+On the first connection, SSH may request [verification of the server's host key](https://manpages.debian.org/trixie/openssh-client/ssh.1.en.html#VERIFYING_HOST_KEYS). Once accepted, enter the Debian user's password.
 After authentication, the terminal prompt should look similar to:
 
 ```text
@@ -516,7 +577,7 @@ sudo shutdown now
 
 ### 5. UFW firewall
 
-**UFW (Uncomplicated Firewall)** is a tool used to manage firewall rules on Linux. A firewall controls incoming and outgoing network traffic based on predefined rules.
+**[UFW (Uncomplicated Firewall)](https://manpages.debian.org/trixie/ufw/ufw.8.en.html)** is a tool used to manage firewall rules on Linux. A firewall controls incoming and outgoing network traffic based on predefined rules.
 
 Born2beRoot requires UFW to be enabled and configured to allow incoming connections through port `4242`, which is used by the SSH service.
 
@@ -564,7 +625,6 @@ Otherwise, enabling the firewall could block the SSH connection.
 
 ```bash
 sudo ufw status
-sudo service ufw status
 ```
 
 The output should indicate `Status: active` and that port `4242` is allowed.
@@ -589,9 +649,9 @@ Remain in this root shell until the instruction to return to the regular user in
 
 **Sudoers:**
 
-`sudoers` is the configuration system that defines which users can execute commands with elevated privileges and under what conditions. Its main configuration file is `/etc/sudoers`.
+[`sudoers`](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html) is the configuration system that defines which users can execute commands with elevated privileges and under what conditions. Its main configuration file is `/etc/sudoers`.
 
-The `/etc/sudoers.d/` directory can contain additional configuration files that are read by `sudo`, provided the main configuration includes this directory.
+The [`/etc/sudoers.d/`](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html#Including_other_files_from_within_sudoers) directory can contain additional configuration files that are read by `sudo`.
 
 Using a separate file is preferable because:
 - It keeps the custom settings separate from the system's default configuration.
@@ -602,11 +662,16 @@ For Born2beRoot, instead of modifying `/etc/sudoers` directly, the configuration
 
 #### 6.1. Configuring Sudo
 
+
 **Create a directory for sudo logs:**
 
 ```bash
 mkdir -p /var/log/sudo
 ```
+
+This creates the directory where sudo will store its command logs and input/output recordings, as required by Born2beRoot. This will be used for the configuration file on the next step.
+
+The `-p` option creates any missing parent directories and prevents an error if the directory already exists.
 
 **Create a custom sudo configuration file:**
 
@@ -614,9 +679,9 @@ mkdir -p /var/log/sudo
 visudo -f /etc/sudoers.d/born2beroot
 ```
 
-Using `visudo` instead of directly editing the file checks the configuration for syntax errors before saving.
+Using [`visudo`](https://manpages.debian.org/trixie/sudo/visudo.8.en.html) instead of directly editing the file checks the configuration for syntax errors before saving.
 
-Add the following configuration:
+There are different [default parameters](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html#SUDOERS_OPTIONS) that can be used to modify `sudo`s' behavior. For this project, the following configuration was added:
 
 ```text
 Defaults passwd_tries=3
@@ -629,13 +694,16 @@ Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/b
 ```
 When saving, `visudo` creates a temporary file (`born2beroot.tmp`) where the changes are stored. After exiting the editor, it checks the file for syntax errors. If the configuration is valid, the temporary file is renamed to `born2beroot`. If errors are found, `visudo` offers the option to correct them before saving.
 
-**Check the configuration for syntax errors:**
+**Note:** Copying and pasting into `visudo` may not work directly through the VirtualBox console. Alternatively, connect to the VM through SSH and edit the configuration file there.
+
+**Verify the sudoers configuration:**
 
 ```bash
 visudo -c
 ```
 
-This checks that the sudo configuration files contain no syntax errors. A successful result indicates that the files were parsed correctly.
+Although `visudo` checks for syntax errors when saving, this command allows us to verify the saved sudoers configuration files without modifying them.
+
 
 **Understanding the configuration:**
 
@@ -645,19 +713,19 @@ This checks that the sudo configuration files contain no syntax errors. A succes
 | `badpass_message` | Shows a custom message when the user enters an incorrect password. |
 | `logfile` | Defines where to save a record of sudo commands, including who used them and when. |
 | `log_input,log_output` | Records what users type and what appears in the terminal when running commands with `sudo`. |
-| `iolog_dir` | Defines the folder where these input and output recordings are saved. |
+| `iolog_dir` | Defines the directory where these input and output recordings are saved. |
 | `use_pty` | Runs sudo commands in a separate virtual terminal to improve security. |
 | `secure_path` | Defines which directories sudo looks in to find commands to execute. |
 
 **Terminal security:**
 
-A **TTY** is a terminal that allows interaction with Linux by typing commands. A **PTY (pseudo-terminal)** is a virtual terminal created by software, such as the terminal used when connecting to the VM through SSH.
+A **TTY** is a terminal that allows interaction with Linux by typing commands. A **[PTY (pseudo-terminal)](https://manpages.debian.org/trixie/manpages/pty.7.en.html)** is a virtual terminal created by software, such as the terminal used when connecting to the VM through SSH.
 
 The subject requires TTY mode to be enabled but does not specify which sudo setting to use:
 
-- **`requiretty`:** Only allows sudo commands to run when the user has a terminal. For example, `sudo apt update` works when typed in a terminal but may be blocked when executed by an automated script without a terminal.
+- **[`requiretty`](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html#:~:text=If%20set%2C%20sudo%20will%20only%20run%20when%20the%20user%20is%20logged%20in%20to%20a%20real%20tty.):** Only allows sudo commands to run when the user has a terminal. For example, `sudo apt update` works when typed in a terminal but may be blocked when executed by an automated script without a terminal.
 
-- **`use_pty`:** Runs sudo commands in a separate virtual terminal. For example, when `sudo apt update` is executed, sudo creates a virtual terminal for `apt` and manages communication with the original terminal. All output remains visible in the same window.
+- **[`use_pty`](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html#:~:text=If%20set%2C%20and%20sudo%20is%20running%20in%20a%20terminal):** Runs sudo commands in a separate virtual terminal. For example, when `sudo apt update` is executed, sudo creates a virtual terminal for `apt` and manages communication with the original terminal. All output remains visible in the same window.
 
 Normally, a program running with root privileges can interact directly with the terminal. If the program is malicious, it could attempt to insert commands for the shell to execute.
 
@@ -679,7 +747,7 @@ First, clear any previous sudo authentication:
 sudo -k
 ```
 
-Normally, `sudo` remembers authentication for a short period, so a password is not required for every command. The `-k` option clears this authentication, forcing sudo to request the user's password again.
+Normally, `sudo` remembers authentication for a short period, so a password is not required for every command. The [`-k` option](https://manpages.debian.org/trixie/sudo/sudo.8.en.html#k) clears this authentication, forcing sudo to request the user's password again.
 
 Now compare:
 
@@ -756,7 +824,7 @@ sudo sudoreplay -d /var/log/sudo -l
 This will display a list of the recorded sessions, confirming that sudo is saving input/output recordings, not just recording which commands were executed. Breaking down the command:
 
 - `sudo`: Executes the command with root privileges.
-- `sudoreplay`: Allows inspection of recorded sudo sessions.
+- [`sudoreplay`](https://manpages.debian.org/trixie/sudo/sudoreplay.8.en.html): Allows inspection of recorded sudo sessions.
 - `-d /var/log/sudo`: Specifies where the recordings are stored.
 - `-l`: Lists the available recorded sessions.
 
@@ -775,21 +843,29 @@ sudo -l
 ```
 This displays the commands the user is allowed to execute with sudo and the sudo defaults that apply to the user.
 
-
 ### 7. Password Policy
 
-Born2beRoot requires a strong password policy to protect user accounts. This includes password expiration rules and password complexity requirements.
+A **password policy** defines rules that passwords must follow to improve account security. It helps prevent unauthorized access by requiring strong passwords and regular password changes.
 
-Sections 7.1–7.3 are performed as root to modify system configuration files and account password settings. In section 7.4, the checks are performed as the regular user, using `sudo` where access to account password settings requires root privileges.
+Born2beRoot requires two types of rules:
+- **Password expiration:** Limits how long a password can be used and how frequently it can be changed.
+- **Password complexity:** Requires passwords to meet certain conditions, such as minimum length, uppercase and lowercase letters, and numbers, making them harder to guess.
+
+Sections 7.1–7.3 are performed as root to modify system configuration files and account password settings. In section 7.4, the checks are performed as the regular user, using `sudo` where administrator privileges are required.
+
+**Switch to root:**
+
+```bash
+su -
+```
 
 #### 7.1. Password Expiration
 
-`/etc/login.defs` is a system configuration file that defines default settings for user accounts, including password expiration rules.
+[`/etc/login.defs`](https://manpages.debian.org/trixie/login.defs/login.defs.5.en.html) is a system configuration file that defines default settings for user accounts, including password expiration rules.
 
 **Configure password expiration:**
 
 ```bash
-su -
 nano /etc/login.defs
 ```
 
@@ -809,7 +885,7 @@ PASS_WARN_AGE   7
 | `PASS_MIN_DAYS` | Users must wait at least 2 days before changing their password again. |
 | `PASS_WARN_AGE` | Users receive a warning during login starting 7 days before their password expires. |
 
-These settings are applied by default when new accounts are created. Existing accounts must be updated separately using `chage`.
+These settings are applied by default when new accounts are created. Existing accounts must be updated separately using [`chage`](https://manpages.debian.org/trixie/passwd/chage.1.en.html).
 
 **Update existing users:**
 
@@ -837,10 +913,8 @@ Check again the values of the settings to confirm that they were correctly updat
 
 #### 7.2. Password Complexity
 
-Password complexity defines the requirements a new password must satisfy.
-
-Password complexity is enforced through **PAM (Pluggable Authentication Modules)**, a system that manages authentication in Linux.
-The `libpam-pwquality` package checks whether new passwords meet the configured security requirements.
+Password complexity is enforced through **[PAM (Pluggable Authentication Modules)](https://www.debian.org/doc/manuals/debian-reference/ch04.en.html#_pam_and_nss)**, a system that manages authentication in Linux.
+The [`libpam-pwquality`](https://packages.debian.org/trixie/libpam-pwquality) package provides the `pam_pwquality` PAM module, which checks whether new passwords meet the configured security requirements.
 
 **Install the package:**
 
@@ -850,7 +924,7 @@ apt install libpam-pwquality
 
 **Configure password complexity:**
 
-`/etc/security/pwquality.conf` is a system configuration file that defines password complexity requirements, including minimum length, required character types, and restrictions on repeated characters.
+[`/etc/security/pwquality.conf`](https://manpages.debian.org/trixie/libpwquality-common/pwquality.conf.5.en.html) is a system configuration file that defines password complexity requirements, including minimum length, required character types, and restrictions on repeated characters. The [pam_pwquality manual](https://manpages.debian.org/trixie/libpam-pwquality/pam_pwquality.8.en.html) documents the configuration options.
 
 ```bash
 nano /etc/security/pwquality.conf
@@ -869,6 +943,8 @@ difok = 7
 enforce_for_root
 ```
 
+**Note:** Copying and pasting into Nano may not work directly through the VirtualBox console. Alternatively, connect to the VM through SSH and edit the system configuration file there.
+
 **Understanding the configuration:**
 
 | Setting | Description |
@@ -886,7 +962,7 @@ enforce_for_root
 
 The root password must follow the same complexity requirements, except for the comparison with the previous password (`difok`).
 
-When root changes a password, the previous password is not requested. Therefore, checks that compare the old and new passwords cannot be performed.
+When root changes a password, the [previous password is not requested](https://manpages.debian.org/trixie/libpam-pwquality/pam_pwquality.8.en.html#enforce_for_root). Therefore, checks that compare the old and new passwords cannot be performed.
 
 #### 7.3. Updating Existing Passwords
 
@@ -905,7 +981,7 @@ Change the passwords of both `root` and `varaniba`.
 
 The minimum password age of 2 days prevents regular users from changing a recently updated password.
 
-If the password change is blocked, root can reset the user's password using:
+If the password change is blocked, root can [reset the user's password](https://manpages.debian.org/trixie/passwd/passwd.1.en.html) using:
 
 ```bash
 passwd varaniba
@@ -958,7 +1034,7 @@ grep -E '^[[:space:]]*password.*pam_pwquality\.so' /etc/pam.d/common-password
 
 An active `pam_pwquality.so` entry confirms that the module is included in PAM's password-changing configuration.
 
-If no active entry appears, check the PAM configuration:
+If no active entry appears, check the [PAM configuration](https://manpages.debian.org/trixie/libpam-runtime/pam-auth-update.8.en.html):
 
 ```bash
 sudo pam-auth-update
@@ -972,9 +1048,6 @@ Make sure the password-quality profile is enabled.
 Born2beRoot requires a Bash script named `monitoring.sh` that displays system information on all logged-in terminals at startup and every 10 minutes.
 
 This section is performed as root because we need administrator privileges to create the monitoring script, access the protected sudo logs, and configure root's crontab.
-
-The `/usr/local/sbin/` directory is intended for locally installed system administration programs and scripts, making it an appropriate location for `monitoring.sh`.
-
 From the regular VM user, switch to root:
 
 ```bash
@@ -983,12 +1056,14 @@ su -
 
 The implementation uses three components:
 
-- **Bash:** A command-line shell and scripting language used to execute commands. In this project, it collects and formats system information.
-- **`wall`:** A command that displays messages on the terminals of logged-in users.
-- **`cron`:** A service that automatically executes commands or scripts according to a schedule.
+- **[Bash](https://manpages.debian.org/trixie/bash/bash.1.en.html):** A command-line shell and scripting language used to execute commands. In this project, it collects and formats system information.
+- **[`wall`](https://manpages.debian.org/trixie/bsdutils/wall.1.en.html):** A command that displays messages on the terminals of logged-in users.
+- **[`cron`](https://manpages.debian.org/trixie/cron/cron.8.en.html):** A service that automatically executes commands or scripts according to a schedule.
 
 
 #### 8.1. Creating the Script
+
+The [`/usr/local/sbin/`](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch04s09.html) directory is intended for locally installed system administration programs and scripts, making it an appropriate location for `monitoring.sh`.
 
 Create the script:
 
@@ -996,28 +1071,7 @@ Create the script:
 nano /usr/local/sbin/monitoring.sh
 ```
 
-The script collects the following information required by the subject:
-
-| Information | Command or source | Description |
-|---|---|---|
-| Architecture | `uname -a` | Displays the operating system architecture and kernel version. |
-| CPU physical | `lscpu` | Shows the number of physical processors. |
-| vCPU | `/proc/cpuinfo` | Shows the number of virtual processors. |
-| Memory Usage | `free --mega` | Displays total and used RAM, and its usage percentage. |
-| Disk Usage | `df -m` | Displays total and used disk space, and its usage percentage. |
-| CPU load | `vmstat` | Calculates the current CPU usage percentage. |
-| Last boot | `uptime -s` | Displays the date and time of the last reboot. |
-| LVM use | `lsblk` | Checks whether LVM is being used. |
-| Connections TCP | `ss` | Counts active TCP connections, such as SSH connections. |
-| User log | `users` | Counts how many user sessions are currently logged into the VM. |
-| Network | `hostname -I`, `ip` | Displays the IPv4 and MAC addresses. |
-| Sudo | `grep` | Counts commands executed with sudo using the log file. |
-
-The script stores the collected information in variables and uses `wall` to display it on the virtual machine terminal. Each execution collects updated system information.
-
-**Note:** On Debian 13 (Trixie), `wall` may fail to display messages in SSH terminals because their terminal information is not correctly registered with `systemd-logind`. This issue is documented in [Debian's bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1115259).
-
-The script used is:
+Insert the following script:
 
 ```text
 #!/bin/bash
@@ -1087,6 +1141,32 @@ wall "	Architecture: $arch
 	Sudo: $sudo_count commands"
 ```
 
+**Note:** Copying and pasting into Nano may not work directly through the VirtualBox console. Alternatively, connect to the VM through SSH and edit the script there.
+
+**Understanding the script:**
+
+The script collects the following information required by the subject:
+
+| Information | Command or source | Description |
+|---|---|---|
+| Architecture | [`uname -a`](https://manpages.debian.org/trixie/coreutils/uname.1.en.html) | Displays the operating system architecture and kernel version. |
+| CPU physical | [`lscpu`](https://manpages.debian.org/trixie/util-linux/lscpu.1.en.html) | Shows the number of physical processors. |
+| vCPU | [`/proc/cpuinfo`](https://manpages.debian.org/trixie/manpages/proc_cpuinfo.5.en.html) | Shows the number of virtual processors. |
+| Memory Usage | [`free --mega`](https://manpages.debian.org/trixie/procps/free.1.en.html) | Displays total and used RAM, and its usage percentage. |
+| Disk Usage | [`df -m`](https://manpages.debian.org/trixie/coreutils/df.1.en.html) | Displays total and used disk space, and its usage percentage. |
+| CPU load | [`vmstat`](https://manpages.debian.org/trixie/procps/vmstat.8.en.html) | Calculates the current CPU usage percentage. |
+| Last boot | [`uptime -s`](https://manpages.debian.org/trixie/procps/uptime.1.en.html) | Displays the date and time of the last reboot. |
+| LVM use | [`lsblk`](https://manpages.debian.org/trixie/util-linux/lsblk.8.en.html) | Checks whether LVM is being used. |
+| Connections TCP | [`ss`](https://manpages.debian.org/trixie/iproute2/ss.8.en.html) | Counts active TCP connections, such as SSH connections. |
+| User log | [`users`](https://manpages.debian.org/trixie/coreutils/users.1.en.html) | Counts how many user sessions are currently logged into the VM. |
+| Network | [`hostname -I`](https://manpages.debian.org/trixie/hostname/hostname.1.en.html), [`ip`](https://manpages.debian.org/trixie/iproute2/ip.8.en.html) | Displays the IPv4 and MAC addresses. |
+| Sudo | `grep` | Counts commands executed with sudo using the log file. |
+
+The script stores the collected information in variables and uses `wall` to display it on the virtual machine terminal. Each execution collects updated system information.
+
+**Note:** On Debian 13 (Trixie), `wall` may fail to display messages in SSH terminals because their terminal information is not correctly registered with `systemd-logind`. This issue is documented in [Debian's bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1115259).
+
+
 **Make the script executable:**
 
 ```bash
@@ -1101,7 +1181,7 @@ chmod +x /usr/local/sbin/monitoring.sh
 
 #### 8.2. Scheduling with Cron
 
-`cron` is a Linux service that automatically executes commands at scheduled times. Its schedules are stored in crontabs. This section is performed as root.
+[`cron`](https://manpages.debian.org/trixie/cron/cron.8.en.html) is a Linux service that automatically executes commands at scheduled times. Its schedules are stored in [crontabs](https://manpages.debian.org/trixie/cron/crontab.5.en.html). This section is performed as root.
 
 **Install and enable cron:**
 
@@ -1117,7 +1197,7 @@ apt install cron
 systemctl enable --now cron
 ```
 
-`systemctl` is used to manage system services. This command performs two actions:
+[`systemctl`](https://manpages.debian.org/trixie/systemd/systemctl.1.en.html) is used to manage system services. This command performs two actions:
 
 - `enable`: Configures cron to start automatically whenever the system boots.
 - `--now`: Also starts cron immediately, without requiring a reboot.
@@ -1141,6 +1221,10 @@ systemctl is-active cron
 - `enabled`: Confirms that cron is configured to start automatically at boot.
 - `active`: Confirms that cron is currently running.
 
+For more detailed information:
+```bash
+service cron status
+```
 
 **Edit root's crontab:**
 
@@ -1159,8 +1243,8 @@ Add the following lines:
 */10 * * * * /usr/local/sbin/monitoring.sh
 ```
 
-- `@reboot`: Executes the script when cron starts, normally at system startup.
-- `*/10 * * * *`: Executes the script every 10 minutes.
+- [`@reboot`](https://manpages.debian.org/trixie/cron/crontab.5.en.html#Extensions): Executes the script when cron starts, normally at system startup.
+- [`*/10 * * * *`](https://manpages.debian.org/trixie/cron/crontab.5.en.html#FORMAT): Executes the script every 10 minutes.
 
 **Note:** Copying and pasting into Nano may not work directly through the VirtualBox console. Alternatively, connect to the VM through SSH and edit the crontab there.
 
@@ -1172,7 +1256,7 @@ Add the following lines:
 crontab -l
 ```
 
-This displays the scheduled tasks for the current user. Since we are working as root, it shows root's crontab.
+This displays the [scheduled tasks for the current user](https://manpages.debian.org/trixie/cron/crontab.1.en.html). Since we are working as root, it shows root's crontab.
 
 The output should include the two entries for `monitoring.sh`.
 
@@ -1212,11 +1296,12 @@ This prevents cron from launching the script again while keeping the script unch
 
 The entries can be reactivated by removing the `#` characters.
 
+
 ### 9. Creating Signature
 
-A **signature** is a unique value calculated from the contents of a file using a hashing algorithm. For Born2beRoot, we use SHA-1 to generate a signature of the VM's virtual disk (`.vdi` file).
+A **signature** is a value calculated from the contents of a file using a hashing algorithm. For Born2beRoot, we use [SHA-1](https://www.gnu.org/software/coreutils/manual/html_node/sha1sum-invocation.html) to generate a signature of the VM's virtual disk (`.vdi` file).
 
-The signature is used to verify that the virtual disk presented during evaluation matches the one submitted for the project.
+The signature allows us to verify that the virtual disk has not changed since it was submitted.
 
 **Shut down the virtual machine:**
 
@@ -1226,28 +1311,43 @@ Before generating the signature, shut down the VM completely:
 sudo shutdown -h now
 ```
 
-- `-h`: Halts the system and normally powers it off.
+- [`-h`](https://manpages.debian.org/trixie/systemd-sysv/shutdown.8.en.html#OPTIONS): Halts the system and normally powers it off.
 - `now`: Starts the shutdown immediately.
 
 This command is executed inside Debian to safely shut down the VM before calculating its signature.
 
-**Locate the virtual disk:**
+**Generate the signature:**
 
-Navigate to the directory containing the `.vdi` file and run:
+From the host computer, navigate to the directory containing the `.vdi` file and run:
 
 ```bash
 sha1sum <virtual_disk_name>.vdi
 ```
 
-The output contains a 40-character SHA-1 hash followed by the filename. For this project:
+The output contains a 40-character SHA-1 hash followed by the filename.
+
+For this project:
 
 ```bash
 sha1sum Born2beRoot.vdi
 ```
 
-**Create `signature.txt`:**
+**Create the signature file:**
 
 Create a file named `signature.txt` at the root of the project's Git repository and paste only the SHA-1 hash into it, without the `.vdi` filename.
+
+**Preserving the signature:**
+
+The SHA-1 hash depends on the contents of the virtual disk. If any data on the disk changes, the hash will almost certainly change as well.
+
+For this reason, **the VM must not be started or modified after generating the signature**. Even starting the VM normally can change system files and produce a different hash.
+
+During the evaluation, the evaluator will calculate the signature of the virtual disk again and compare it with the value stored in `signature.txt`.
+
+If the two values match, it confirms that the disk has not changed in a way detected by the hash since the signature was created.
+
+If the VM needs to be modified before submission, a new signature must be generated and `signature.txt` updated.
+
 
 # RESOURCES
 
@@ -1256,43 +1356,9 @@ To create this project, the references and tools used were:
 
 - Linux man page [manual](https://linux.die.net/man/)
 - Github [website](https://github.com/)
-- Born2BeRoot guide [website](https://noreply.gitbook.io/born2beroot)
-- Debian [Recommended Partitioning Scheme](https://www.debian.org/releases/trixie/amd64/apcs03.en.html)
-- Debian [Directory Tree](https://www.debian.org/releases/trixie/amd64/apcs02.en.html)
-- Debian [Disk Space Needed for Tasks](https://www.debian.org/releases/trixie/amd64/apds02.en.html)
-- Debian [Package Management](https://www.debian.org/doc/manuals/debian-reference/ch02)
-- Debian Wiki [sudo](https://wiki.debian.org/sudo)
-- Debian [sudoers Configuration Manual](https://manpages.debian.org/trixie/sudo/sudoers.5.en.html)
-- Debian [visudo Manual](https://manpages.debian.org/trixie/sudo/visudo.8.en.html)
-- Debian Wiki [System Groups](https://wiki.debian.org/SystemGroups)
-- Debian Wiki [SSH](https://wiki.debian.org/SSH)
-- Debian [SSH Server Configuration Manual](https://manpages.debian.org/trixie/openssh-server/sshd_config.5.en.html)
-- Debian [SSH Client Manual](https://manpages.debian.org/trixie/openssh-client/ssh.1.en.html)
-- VirtualBox [User Manual](https://www.virtualbox.org/manual/)
-- VirtualBox [NAT Networking and Port Forwarding](https://www.virtualbox.org/manual/topics/networkingdetails.html#nat)
-- Debian [Password Aging Configuration](https://manpages.debian.org/trixie/login.defs/login.defs.5.en.html)
-- Debian [Password Quality Configuration](https://manpages.debian.org/trixie/libpwquality-common/pwquality.conf.5.en.html)
-- Debian [PAM Password Quality Module](https://manpages.debian.org/trixie/libpam-pwquality/pam_pwquality.8.en.html)
-- Debian [PAM Configuration](https://manpages.debian.org/trixie/libpam-runtime/pam-auth-update.8.en.html)
-- Debian [Cron Manual](https://manpages.debian.org/trixie/cron/crontab.5.en.html)
-- Debian [Crontab Manual](https://manpages.debian.org/trixie/cron/crontab.1.en.html)
-- Debian [Wall Manual](https://manpages.debian.org/trixie/bsdutils/wall.1.en.html)
-- Debian [Bash Manual](https://manpages.debian.org/trixie/bash/bash.1.en.html)
+- VirtualBox [User Manual](https://docs.oracle.com/en/virtualization/virtualbox/7.1/user/)
 
-- Debian [Reasons to Use Debian](https://www.debian.org/intro/why_debian.html)
-- Rocky Linux [Project Overview](https://rockylinux.org/)
-- Rocky Linux [DNF Package Manager](https://docs.rockylinux.org/guides/package_management/dnf_package_manager/)
-- AppArmor [Documentation](https://apparmor.net/)
-- Debian Wiki [Using AppArmor](https://wiki.debian.org/AppArmor/HowToUse)
-- Rocky Linux [SELinux Security](https://docs.rockylinux.org/guides/security/learning_selinux/)
-- Ubuntu Server [Firewall Documentation](https://ubuntu.com/server/docs/firewalls/)
 - firewalld [Documentation](https://firewalld.org/documentation/index.html)
-- Oracle VirtualBox [Introduction and Supported Platforms](https://docs.oracle.com/en/virtualization/virtualbox/7.1/user/Introduction.html)
-- UTM [Documentation](https://docs.getutm.app/)
-- UTM [Architecture and System Settings](https://docs.getutm.app/settings-qemu/system/)
-- UTM [QEMU Backend](https://docs.getutm.app/settings-qemu/settings-qemu/)
-
-
 
 ## AI Use:
 
