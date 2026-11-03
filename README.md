@@ -1336,7 +1336,16 @@ sha1sum Born2beRoot.vdi
 
 **Create the signature file:**
 
-Create a file named `signature.txt` at the root of the project's Git repository and paste only the SHA-1 hash into it, without the `.vdi` filename.
+Create a file named `signature.txt` at the root of the project's Git repository and paste only the SHA-1 hash into it, without the `.vdi` filename. Or use this command:
+
+```bash
+sha1sum Born2beRoot.vdi | awk '{print $1}'>signature.txt
+```
+
+Verify this with:
+```bash
+cat signature.txt
+```
 
 **Preserving the signature:**
 
@@ -1346,7 +1355,30 @@ For this reason, **the VM must not be started or modified after generating the s
 
 During the evaluation, the evaluator will calculate the signature of the virtual disk again and compare it with the value stored in `signature.txt`.
 
-If the two values match, it confirms that the disk has not changed in a way detected by the hash since the signature was created.
+**Peer to peer evaluation:**
+
+To verify that the signatures match, run the following commands on the host computer.
+
+Store the current virtual disk's SHA-1 hash in a variable:
+
+```bash
+s1=$(sha1sum Born2beRoot.vdi | awk '{print $1}')
+```
+
+Store the SHA-1 hash from `signature.txt` in another variable:
+
+```bash
+s2=$(cat /path/to/signature.txt)
+```
+
+Compare both values:
+
+```bash
+diff <(echo "$s1") <(echo "$s2")
+```
+
+- **No output:** The signatures match, meaning no difference was detected.
+- **Output showing differences:** The signatures do not match, meaning the virtual disk's current hash is different from the submitted one.
 
 If the VM needs to be modified before submission, a new signature must be generated and `signature.txt` updated.
 
